@@ -28,7 +28,7 @@ Open http://127.0.0.1:8080 in your browser. The server re-scans every 30 seconds
 - **Type hints where they aid readability.** Not a hard requirement, but helpful on function signatures.
 - **Docstrings explain *why*, not *what*.** The code already shows what.
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the component layout and [`docs/CUSTOMIZING.md`](docs/CUSTOMIZING.md) for a walkthrough of adding a new API route.
+Component layout: `cli.py` (entry points) → `token_dashboard/scanner.py` (JSONL → SQLite) → `token_dashboard/db.py` (query helpers) → `token_dashboard/server.py` (HTTP + SSE + `/api/*` routes) → `web/` (vanilla JS UI). See [`CLAUDE.md`](CLAUDE.md) for the short architecture overview. To add a new API route: add a handler branch in `token_dashboard/server.py`, put the SQL in a helper in `token_dashboard/db.py`, and add a test under `tests/`.
 
 ## Opening a pull request
 

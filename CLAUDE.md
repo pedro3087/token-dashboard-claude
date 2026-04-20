@@ -10,11 +10,9 @@ Inspired by [phuryn/claude-usage](https://github.com/phuryn/claude-usage) but di
 
 ## Status
 
-Working codebase. 66 Python unit tests (`python3 -m unittest discover tests`). Seven UI routes wired up. Runs on macOS, Windows, and Linux.
+Working codebase. 68 Python unit tests (`python3 -m unittest discover tests`). Seven UI tabs wired up (Overview, Prompts, Sessions, Projects, Skills, Tips, Settings). Runs on macOS, Windows, and Linux.
 
 ## Architecture
-
-See `docs/ARCHITECTURE.md` for the full data-flow diagram and component descriptions. Short version:
 
 - `cli.py` → `token_dashboard/scanner.py` → `~/.claude/token-dashboard.db` (SQLite)
 - `token_dashboard/server.py` exposes JSON APIs (`/api/*`) + SSE stream (`/api/stream`) + static frontend (`web/`)
@@ -34,7 +32,7 @@ Claude Code writes one JSONL file per session to `~/.claude/projects/<project-sl
 
 ## Customizing
 
-See `docs/CUSTOMIZING.md` for env vars (`PORT`, `HOST`, `CLAUDE_PROJECTS_DIR`, `TOKEN_DASHBOARD_DB`), `pricing.json` format, and a walkthrough of how to add a new API route.
+Env vars: `PORT` (default 8080), `HOST` (default 127.0.0.1), `CLAUDE_PROJECTS_DIR`, `TOKEN_DASHBOARD_DB`. Pricing lives in `pricing.json`. See README.md § Environment variables for details.
 
 ## Known limitations
 
@@ -47,5 +45,3 @@ python3 -m unittest discover tests        # all tests
 python3 cli.py dashboard --no-open        # start the server
 curl http://127.0.0.1:8080/api/overview   # sanity-check an endpoint
 ```
-
-See `docs/VERIFICATION.md` for the full end-to-end checklist.
