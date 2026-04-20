@@ -1615,5 +1615,15 @@ Tool calls: `tool_use` blocks are captured with `name` + the whitelisted primary
 
 `pricing.json` contains current entries for `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5` matching Anthropic's public per-million-token rates as of 2026-04-19. `claude-opus-4-6` is kept as a fallback for older transcripts. The `tier_fallback` object covers unknown model names by family (opus / sonnet / haiku).
 
-<!-- Task 5 appends "### 5. SQL injection surface" here -->
+### 5. SQL injection surface — clean
+
+All f-string SQL in `token_dashboard/` interpolates only internal values: hardcoded column names (`timestamp`), fixed sort directions, and `?`-placeholder lists built from internal UUIDs. Every user-reachable value (since/until query strings, plan name, tip key, session id) is passed via sqlite3 parameter binding.
+
+Spot-checked:
+- `db.py:127-129` (`_range_clause`) — column name is literal, values parameterized.
+- `db.py:191-362` — every `f"""..."""` query uses `?` for user-supplied values.
+- `scanner.py:183-184` (`_evict_prior_snapshots`) — `placeholders` is `?,?,?`, uuids bound via sqlite3.
+- `server.py` — no SQL strings; all queries go through `db.py` helpers.
+
+**Verdict:** no action required.
 <!-- Task 6 appends "### 6. Path-write safety" here -->
