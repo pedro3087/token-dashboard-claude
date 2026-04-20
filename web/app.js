@@ -11,7 +11,7 @@ export const fmt = {
   usd4:  n => n == null ? '—' : '$' + Number(n).toFixed(4),
   pct:   n => n == null ? '—' : (n * 100).toFixed(0) + '%',
   short: (s, n=80) => s == null ? '' : (s.length > n ? s.slice(0, n - 1) + '…' : s),
-  htmlSafe: s => (s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])),
+  htmlSafe: s => (s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
   modelClass: m => {
     const s = (m || '').toLowerCase();
     if (s.includes('opus'))   return 'opus';

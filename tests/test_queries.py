@@ -143,7 +143,7 @@ class ProjectNameTests(unittest.TestCase):
 
     def test_basename_of_windows_cwd(self):
         self.assertEqual(
-            project_name_for(r"C:\Users\nateh\OneDrive\Desktop\Token Dashboard", "anything"),
+            project_name_for(r"C:\Users\alice\projects\Token Dashboard", "anything"),
             "Token Dashboard",
         )
 
@@ -166,17 +166,17 @@ class ProjectNameTests(unittest.TestCase):
         # cwd is a subfolder; slug matches the parent → return the parent's basename
         self.assertEqual(
             project_name_for(
-                r"C:\Users\nateh\OneDrive\Desktop\Herk-2\claude-usage",
-                "C--Users-nateh-OneDrive-Desktop-Herk-2",
+                r"C:\Users\alice\projects\MyProject\subdir",
+                "C--Users-alice-projects-MyProject",
             ),
-            "Herk-2",
+            "MyProject",
         )
 
     def test_walks_up_preserves_spaces(self):
         self.assertEqual(
             project_name_for(
-                r"C:\Users\nateh\OneDrive\Desktop\Token Dashboard\src\subdir",
-                "C--Users-nateh-OneDrive-Desktop-Token-Dashboard",
+                r"C:\Users\alice\projects\Token Dashboard\src\subdir",
+                "C--Users-alice-projects-Token-Dashboard",
             ),
             "Token Dashboard",
         )

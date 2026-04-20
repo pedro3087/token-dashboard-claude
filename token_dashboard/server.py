@@ -26,6 +26,9 @@ PRICING_JSON = Path(__file__).resolve().parent.parent / "pricing.json"
 
 EVENTS: "queue.Queue[dict]" = queue.Queue()
 
+MAX_POST_BYTES = 1_000_000  # 1 MB — we only accept tiny JSON bodies (plan, tip key)
+MAX_LIMIT = 1000
+
 
 def _send_json(handler, obj, status: int = 200) -> None:
     body = json.dumps(obj, default=str).encode("utf-8")
@@ -35,6 +38,18 @@ def _send_json(handler, obj, status: int = 200) -> None:
     handler.send_header("Cache-Control", "no-store")
     handler.end_headers()
     handler.wfile.write(body)
+
+
+def _send_error(handler, status: int, msg: str) -> None:
+    _send_json(handler, {"error": msg}, status=status)
+
+
+def _clamp_limit(raw, default: int) -> int:
+    try:
+        v = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(1, min(v, MAX_LIMIT))
 
 
 def _serve_static(handler, rel: str) -> None:
@@ -83,7 +98,7 @@ def build_handler(db_path: str, projects_dir: str):
                 totals["cost_usd"] = round(cost_usd, 4)
                 return _send_json(self, totals)
             if path == "/api/prompts":
-                limit = int(qs.get("limit", ["50"])[0])
+                limit = _clamp_limit(qs.get("limit", ["50"])[0], 50)
                 sort = qs.get("sort", ["tokens"])[0]
                 rows = expensive_prompts(db_path, limit=limit, sort=sort)
                 for r in rows:
@@ -100,7 +115,7 @@ def build_handler(db_path: str, projects_dir: str):
                 return _send_json(self, tool_token_breakdown(db_path, since, until))
             if path == "/api/sessions":
                 return _send_json(self, recent_sessions(
-                    db_path, limit=int(qs.get("limit", ["20"])[0]),
+                    db_path, limit=_clamp_limit(qs.get("limit", ["20"])[0], 20),
                     since=since, until=until,
                 ))
             if path == "/api/daily":
@@ -151,8 +166,18 @@ def build_handler(db_path: str, projects_dir: str):
 
         def do_POST(self):
             url = urlparse(self.path)
-            length = int(self.headers.get("Content-Length") or 0)
-            body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                return _send_error(self, 400, "invalid Content-Length")
+            if length < 0 or length > MAX_POST_BYTES:
+                return _send_error(self, 413, f"body too large (max {MAX_POST_BYTES} bytes)")
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                return _send_error(self, 400, "invalid JSON")
+            if not isinstance(body, dict):
+                return _send_error(self, 400, "body must be a JSON object")
             if url.path == "/api/plan":
                 set_plan(db_path, body.get("plan", "api"))
                 return _send_json(self, {"ok": True})
