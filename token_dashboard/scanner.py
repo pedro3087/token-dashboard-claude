@@ -12,12 +12,12 @@ from .db import connect
 INSERT_MSG = """
 INSERT OR REPLACE INTO messages (
   uuid, parent_uuid, session_id, project_slug, cwd, git_branch, cc_version, entrypoint,
-  type, is_sidechain, agent_id, timestamp, model, stop_reason, prompt_id,
+  type, is_sidechain, agent_id, timestamp, model, stop_reason, prompt_id, message_id,
   input_tokens, output_tokens, cache_read_tokens, cache_create_5m_tokens, cache_create_1h_tokens,
   prompt_text, prompt_chars, tool_calls_json
 ) VALUES (
   :uuid, :parent_uuid, :session_id, :project_slug, :cwd, :git_branch, :cc_version, :entrypoint,
-  :type, :is_sidechain, :agent_id, :timestamp, :model, :stop_reason, :prompt_id,
+  :type, :is_sidechain, :agent_id, :timestamp, :model, :stop_reason, :prompt_id, :message_id,
   :input_tokens, :output_tokens, :cache_read_tokens, :cache_create_5m_tokens, :cache_create_1h_tokens,
   :prompt_text, :prompt_chars, :tool_calls_json
 )
@@ -142,6 +142,7 @@ def parse_record(rec: dict, project_slug: str) -> Tuple[dict, List[dict]]:
         "model":        msg_obj.get("model"),
         "stop_reason":  msg_obj.get("stop_reason"),
         "prompt_id":    rec.get("promptId"),
+        "message_id":   msg_obj.get("id"),
         "prompt_text":  text,
         "prompt_chars": chars,
         "tool_calls_json": None,
@@ -165,6 +166,24 @@ def _project_slug(file_path: Path, projects_root: Path) -> str:
     return rel.parts[0]
 
 
+def _evict_prior_snapshots(conn, session_id: str, message_id: str, keep_uuid: str) -> None:
+    """Remove older streaming snapshots for the same (session_id, message_id).
+
+    Claude Code writes 2–3 JSONL lines per assistant response (partial → final)
+    with identical message.id but distinct top-level uuids. Only the final
+    tally matches billing, so earlier snapshots must be replaced, not summed.
+    """
+    old = [r[0] for r in conn.execute(
+        "SELECT uuid FROM messages WHERE session_id=? AND message_id=? AND uuid!=?",
+        (session_id, message_id, keep_uuid),
+    )]
+    if not old:
+        return
+    placeholders = ",".join("?" * len(old))
+    conn.execute(f"DELETE FROM tool_calls WHERE message_uuid IN ({placeholders})", old)
+    conn.execute(f"DELETE FROM messages WHERE uuid IN ({placeholders})", old)
+
+
 def scan_file(path: Path, project_slug: str, conn, start_byte: int = 0) -> dict:
     msgs = tools = 0
     with open(path, "rb") as fb:
@@ -186,6 +205,8 @@ def scan_file(path: Path, project_slug: str, conn, start_byte: int = 0) -> dict:
             msg, tlist = parse_record(rec, project_slug)
             if not msg["session_id"] or not msg["timestamp"]:
                 continue
+            if msg["message_id"]:
+                _evict_prior_snapshots(conn, msg["session_id"], msg["message_id"], msg["uuid"])
             conn.execute(INSERT_MSG, msg)
             for t in tlist:
                 conn.execute(INSERT_TOOL, t)

@@ -68,16 +68,100 @@ export function barChart(el, { categories, values, color }) {
   return c;
 }
 
+export function stackedBarChart(el, { categories, series, formatter }) {
+  const c = mount(el);
+  c.setOption({
+    ...BASE,
+    tooltip: {
+      ...TOOLTIP,
+      axisPointer: { type: 'shadow' },
+      valueFormatter: formatter || (v => Number(v).toLocaleString()),
+    },
+    legend: {
+      textStyle: { color: '#8B98A6' },
+      top: 0, right: 0, icon: 'roundRect',
+      itemWidth: 8, itemHeight: 8,
+    },
+    xAxis: {
+      ...X_AXIS, type: 'category', data: categories,
+      axisLabel: { ...X_AXIS.axisLabel, interval: categories.length > 20 ? 'auto' : 0, rotate: categories.length > 12 ? 45 : 0 },
+    },
+    yAxis: { ...Y_AXIS, type: 'value' },
+    series: series.map((s, i) => ({
+      name: s.name,
+      type: 'bar',
+      stack: 'total',
+      data: s.values,
+      itemStyle: { color: s.color || PALETTE[i % PALETTE.length] },
+      barMaxWidth: 24,
+      emphasis: { focus: 'series' },
+    })),
+  });
+  return c;
+}
+
+export function groupedBarChart(el, { categories, series, formatter }) {
+  const c = mount(el);
+  c.setOption({
+    ...BASE,
+    tooltip: {
+      ...TOOLTIP,
+      axisPointer: { type: 'shadow' },
+      valueFormatter: formatter || (v => Number(v).toLocaleString()),
+    },
+    legend: {
+      textStyle: { color: '#8B98A6' },
+      top: 0, right: 0, icon: 'roundRect',
+      itemWidth: 8, itemHeight: 8,
+    },
+    xAxis: {
+      ...X_AXIS, type: 'category', data: categories,
+      axisLabel: { ...X_AXIS.axisLabel, interval: 0, rotate: categories.length > 5 ? 25 : 0 },
+    },
+    yAxis: { ...Y_AXIS, type: 'value' },
+    series: series.map((s, i) => ({
+      name: s.name,
+      type: 'bar',
+      data: s.values,
+      itemStyle: { color: s.color || PALETTE[i % PALETTE.length], borderRadius: [4, 4, 0, 0] },
+      barMaxWidth: 24,
+      emphasis: { focus: 'series' },
+    })),
+  });
+  return c;
+}
+
 export function donutChart(el, data) {
   const c = mount(el);
   c.setOption({
     color: PALETTE,
-    tooltip: { backgroundColor: '#0F1419', borderColor: '#283040', borderWidth: 1, textStyle: { color: '#E6EDF3', fontFamily: 'Inter' } },
-    legend: { textStyle: { color: '#8B98A6' }, bottom: 0, icon: 'roundRect', itemWidth: 8, itemHeight: 8 },
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: '#0F1419', borderColor: '#283040', borderWidth: 1,
+      textStyle: { color: '#E6EDF3', fontFamily: 'Inter' },
+      formatter: p => `${p.name}<br/><b>${Number(p.value).toLocaleString()}</b> tokens (${p.percent.toFixed(1)}%)`,
+    },
+    legend: {
+      textStyle: { color: '#8B98A6' },
+      bottom: 10, icon: 'roundRect', itemWidth: 8, itemHeight: 8,
+      type: 'scroll',
+    },
     series: [{
-      type: 'pie', radius: ['58%', '82%'], avoidLabelOverlap: true, padAngle: 2,
+      type: 'pie',
+      center: ['50%', '44%'],
+      radius: ['48%', '68%'],
+      avoidLabelOverlap: true,
+      padAngle: 2,
       itemStyle: { borderColor: '#0F1419', borderWidth: 2, borderRadius: 4 },
-      label: { show: false }, labelLine: { show: false },
+      label: {
+        show: true,
+        position: 'inside',
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 600,
+        formatter: ({ percent }) => percent >= 6 ? percent.toFixed(0) + '%' : '',
+      },
+      labelLine: { show: false },
       data,
     }],
   });

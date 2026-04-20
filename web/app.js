@@ -3,8 +3,10 @@
 export const $  = (sel, root=document) => root.querySelector(sel);
 export const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
+const COMPACT = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 export const fmt = {
   int:   n => (n ?? 0).toLocaleString(),
+  compact: n => COMPACT.format(n ?? 0),
   usd:   n => n == null ? '—' : '$' + Number(n).toFixed(2),
   usd4:  n => n == null ? '—' : '$' + Number(n).toFixed(4),
   pct:   n => n == null ? '—' : (n * 100).toFixed(0) + '%',
@@ -33,8 +35,8 @@ const ROUTES = {
   '/overview': () => import('/web/routes/overview.js'),
   '/prompts':  () => import('/web/routes/prompts.js'),
   '/sessions': () => import('/web/routes/sessions.js'),
-  '/tools':    () => import('/web/routes/tools.js'),
   '/projects': () => import('/web/routes/projects.js'),
+  '/skills':   () => import('/web/routes/skills.js'),
   '/tips':     () => import('/web/routes/tips.js'),
   '/settings': () => import('/web/routes/settings.js'),
 };
@@ -60,8 +62,9 @@ function setActiveTab(routeKey) {
 
 async function render() {
   const hash = location.hash.replace(/^#/, '') || '/overview';
-  let key = hash;
-  if (hash.startsWith('/sessions/')) key = '/sessions';
+  const path = hash.split('?')[0];
+  let key = path;
+  if (path.startsWith('/sessions/')) key = '/sessions';
   setActiveTab(key);
   const loader = ROUTES[key] || ROUTES['/overview'];
   const mod = await loader();

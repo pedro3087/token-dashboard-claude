@@ -13,10 +13,12 @@ from urllib.parse import urlparse, parse_qs
 from .db import (
     overview_totals, expensive_prompts, project_summary,
     tool_token_breakdown, recent_sessions, session_turns,
+    daily_token_breakdown, model_breakdown, skill_breakdown,
 )
 from .pricing import load_pricing, cost_for, get_plan, set_plan
 from .tips import all_tips, dismiss_tip
 from .scanner import scan_dir
+from .skills import cached_catalog
 
 
 WEB_ROOT = Path(__file__).resolve().parent.parent / "web"
@@ -62,19 +64,25 @@ def build_handler(db_path: str, projects_dir: str):
             url = urlparse(self.path)
             qs = parse_qs(url.query or "")
             path = url.path
+            since = qs.get("since", [None])[0]
+            until = qs.get("until", [None])[0]
             if path in ("/", "/index.html"):
                 return _serve_static(self, "index.html")
             if path.startswith("/web/"):
                 return _serve_static(self, path[5:])
             if path == "/api/overview":
-                return _send_json(self, overview_totals(
-                    db_path,
-                    qs.get("since", [None])[0],
-                    qs.get("until", [None])[0],
-                ))
+                totals = overview_totals(db_path, since, until)
+                cost_usd = 0.0
+                for m in model_breakdown(db_path, since, until):
+                    c = cost_for(m["model"], m, pricing)
+                    if c["usd"] is not None:
+                        cost_usd += c["usd"]
+                totals["cost_usd"] = round(cost_usd, 4)
+                return _send_json(self, totals)
             if path == "/api/prompts":
                 limit = int(qs.get("limit", ["50"])[0])
-                rows = expensive_prompts(db_path, limit=limit)
+                sort = qs.get("sort", ["tokens"])[0]
+                rows = expensive_prompts(db_path, limit=limit, sort=sort)
                 for r in rows:
                     c = cost_for(r["model"], {
                         "input_tokens": 0, "output_tokens": 0,
@@ -84,11 +92,30 @@ def build_handler(db_path: str, projects_dir: str):
                     r["estimated_cost_usd"] = c["usd"]
                 return _send_json(self, rows)
             if path == "/api/projects":
-                return _send_json(self, project_summary(db_path))
+                return _send_json(self, project_summary(db_path, since, until))
             if path == "/api/tools":
-                return _send_json(self, tool_token_breakdown(db_path))
+                return _send_json(self, tool_token_breakdown(db_path, since, until))
             if path == "/api/sessions":
-                return _send_json(self, recent_sessions(db_path, limit=int(qs.get("limit", ["20"])[0])))
+                return _send_json(self, recent_sessions(
+                    db_path, limit=int(qs.get("limit", ["20"])[0]),
+                    since=since, until=until,
+                ))
+            if path == "/api/daily":
+                return _send_json(self, daily_token_breakdown(db_path, since, until))
+            if path == "/api/skills":
+                rows = skill_breakdown(db_path, since, until)
+                catalog = cached_catalog()
+                for r in rows:
+                    info = catalog.get(r["skill"])
+                    r["tokens_per_call"] = info["tokens"] if info else None
+                return _send_json(self, rows)
+            if path == "/api/by-model":
+                rows = model_breakdown(db_path, since, until)
+                for r in rows:
+                    c = cost_for(r["model"], r, pricing)
+                    r["cost_usd"] = c["usd"]
+                    r["cost_estimated"] = c["estimated"]
+                return _send_json(self, rows)
             if path.startswith("/api/sessions/"):
                 sid = path.rsplit("/", 1)[1]
                 return _send_json(self, session_turns(db_path, sid))

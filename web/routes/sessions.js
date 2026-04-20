@@ -17,7 +17,7 @@ async function renderList(root) {
           ${list.map(s => `
             <tr>
               <td class="mono">${fmt.ts(s.started)}</td>
-              <td>${fmt.htmlSafe(s.project_slug)}</td>
+              <td title="${fmt.htmlSafe(s.project_slug)}">${fmt.htmlSafe(s.project_name || s.project_slug)}</td>
               <td class="num">${fmt.int(s.turns)}</td>
               <td class="num">${fmt.int(s.tokens)}</td>
               <td><a href="#/sessions/${encodeURIComponent(s.session_id)}" class="mono">${fmt.htmlSafe(s.session_id.slice(0,8))}…</a></td>
@@ -39,7 +39,10 @@ async function renderSession(root, id) {
     const m = t.model || 'unknown';
     modelCounts[m] = (modelCounts[m] || 0) + 1;
   }
-  const project = (turns[0] && turns[0].project_slug) || '';
+  const slug = (turns[0] && turns[0].project_slug) || '';
+  const cwd = (turns.find(t => t.cwd) || {}).cwd || '';
+  const base = cwd ? cwd.replace(/\\/g, '/').replace(/\/+$/, '').split('/').pop() : '';
+  const project = base || slug;
   const started = (turns[0] && turns[0].timestamp) || '';
   const ended = (turns[turns.length-1] && turns[turns.length-1].timestamp) || '';
 
